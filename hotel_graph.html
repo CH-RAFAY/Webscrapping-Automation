@@ -1,0 +1,342 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Interactive Hotel Knowledge Graph</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #f8fafc;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        }
+        #container {
+            width: 100vw;
+            height: 100vh;
+            overflow: auto;
+        }
+        #graph {
+            width: 300%;
+            height: 300%;
+            min-width: 3000px;
+            min-height: 3000px;
+            background-color: #ffffff;
+            background-image: radial-gradient(#f1f5f9 1px, transparent 1px);
+            background-size: 30px 30px;
+        }
+        .tooltip {
+            position: fixed;
+            padding: 12px 16px;
+            background-color: rgba(255, 255, 255, 0.98);
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            pointer-events: none;
+            font-size: 14px;
+            max-width: 300px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            z-index: 1000;
+            transition: all 0.2s ease;
+            opacity: 0;
+        }
+        .node {
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .link {
+            transition: all 0.2s ease;
+        }
+        .node-label {
+            font-weight: 800;
+            pointer-events: none;
+            text-shadow: 0px 1px 2px rgba(255,255,255,0.9);
+        }
+        .controls {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.98);
+            padding: 12px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            backdrop-filter: blur(8px);
+        }
+        button {
+            margin: 0 4px;
+            padding: 8px 16px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            background: white;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            color: #1e293b;
+            transition: all 0.2s ease;
+        }
+        button:hover {
+            background: #f8fafc;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+    </style>
+</head>
+<body>
+    <div class="controls">
+        <button onclick="zoomIn()">Zoom In</button>
+        <button onclick="zoomOut()">Zoom Out</button>
+        <button onclick="resetZoom()">Reset</button>
+    </div>
+    <div id="container">
+        <div id="graph"></div>
+    </div>
+    <div class="tooltip"></div>
+    <script>
+        const hotels = [{"Name": "Hotel A", "Location": "New York", "Rating": 3.5, "Price": 229, "Link": "https://example.com/hotel_0"}, {"Name": "Hotel B", "Location": "New York", "Rating": 4.8, "Price": 448, "Link": "https://example.com/hotel_1"}, {"Name": "Hotel C", "Location": "New York", "Rating": 4.2, "Price": 196, "Link": "https://example.com/hotel_2"}, {"Name": "Hotel D", "Location": "New York", "Rating": 4.1, "Price": 117, "Link": "https://example.com/hotel_3"}, {"Name": "Hotel E", "Location": "New York", "Rating": 3.2, "Price": 175, "Link": "https://example.com/hotel_4"}, {"Name": "Hotel F", "Location": "New York", "Rating": 4.3, "Price": 293, "Link": "https://example.com/hotel_5"}, {"Name": "Hotel G", "Location": "New York", "Rating": 3.5, "Price": 147, "Link": "https://example.com/hotel_6"}, {"Name": "Hotel H", "Location": "New York", "Rating": 4.9, "Price": 156, "Link": "https://example.com/hotel_7"}, {"Name": "Hotel I", "Location": "New York", "Rating": 3.2, "Price": 386, "Link": "https://example.com/hotel_8"}, {"Name": "Hotel J", "Location": "New York", "Rating": 4.6, "Price": 261, "Link": "https://example.com/hotel_9"}, {"Name": "Hotel K", "Location": "New York", "Rating": 4.5, "Price": 405, "Link": "https://example.com/hotel_10"}, {"Name": "Hotel L", "Location": "New York", "Rating": 3.8, "Price": 375, "Link": "https://example.com/hotel_11"}, {"Name": "Hotel M", "Location": "New York", "Rating": 4.3, "Price": 267, "Link": "https://example.com/hotel_12"}, {"Name": "Hotel N", "Location": "New York", "Rating": 3.1, "Price": 491, "Link": "https://example.com/hotel_13"}, {"Name": "Hotel O", "Location": "New York", "Rating": 4.3, "Price": 486, "Link": "https://example.com/hotel_14"}, {"Name": "Hotel P", "Location": "New York", "Rating": 4.8, "Price": 486, "Link": "https://example.com/hotel_15"}, {"Name": "Hotel Q", "Location": "New York", "Rating": 3.8, "Price": 463, "Link": "https://example.com/hotel_16"}, {"Name": "Hotel R", "Location": "New York", "Rating": 3.2, "Price": 183, "Link": "https://example.com/hotel_17"}, {"Name": "Hotel S", "Location": "New York", "Rating": 3.4, "Price": 232, "Link": "https://example.com/hotel_18"}, {"Name": "Hotel T", "Location": "New York", "Rating": 3.3, "Price": 154, "Link": "https://example.com/hotel_19"}, {"Name": "Hotel U", "Location": "New York", "Rating": 4.0, "Price": 246, "Link": "https://example.com/hotel_20"}, {"Name": "Hotel V", "Location": "New York", "Rating": 5.0, "Price": 111, "Link": "https://example.com/hotel_21"}, {"Name": "Hotel W", "Location": "New York", "Rating": 4.5, "Price": 149, "Link": "https://example.com/hotel_22"}, {"Name": "Hotel X", "Location": "New York", "Rating": 4.4, "Price": 475, "Link": "https://example.com/hotel_23"}, {"Name": "Hotel Y", "Location": "New York", "Rating": 4.2, "Price": 275, "Link": "https://example.com/hotel_24"}, {"Name": "Hotel Z", "Location": "New York", "Rating": 3.9, "Price": 206, "Link": "https://example.com/hotel_25"}, {"Name": "Hotel AA", "Location": "New York", "Rating": 4.1, "Price": 323, "Link": "https://example.com/hotel_26"}, {"Name": "Hotel AB", "Location": "New York", "Rating": 3.7, "Price": 261, "Link": "https://example.com/hotel_27"}, {"Name": "Hotel AC", "Location": "New York", "Rating": 4.4, "Price": 375, "Link": "https://example.com/hotel_28"}, {"Name": "Hotel AD", "Location": "New York", "Rating": 4.6, "Price": 162, "Link": "https://example.com/hotel_29"}, {"Name": "Hotel AE", "Location": "New York", "Rating": 4.3, "Price": 148, "Link": "https://example.com/hotel_30"}, {"Name": "Hotel AF", "Location": "New York", "Rating": 4.0, "Price": 379, "Link": "https://example.com/hotel_31"}, {"Name": "Hotel AG", "Location": "New York", "Rating": 3.5, "Price": 364, "Link": "https://example.com/hotel_32"}, {"Name": "Hotel AH", "Location": "New York", "Rating": 3.6, "Price": 374, "Link": "https://example.com/hotel_33"}, {"Name": "Hotel AI", "Location": "New York", "Rating": 4.5, "Price": 246, "Link": "https://example.com/hotel_34"}, {"Name": "Hotel AJ", "Location": "New York", "Rating": 4.3, "Price": 343, "Link": "https://example.com/hotel_35"}, {"Name": "Hotel AK", "Location": "New York", "Rating": 3.5, "Price": 297, "Link": "https://example.com/hotel_36"}, {"Name": "Hotel AL", "Location": "New York", "Rating": 4.8, "Price": 186, "Link": "https://example.com/hotel_37"}, {"Name": "Hotel AM", "Location": "New York", "Rating": 4.4, "Price": 249, "Link": "https://example.com/hotel_38"}, {"Name": "Hotel AN", "Location": "New York", "Rating": 4.8, "Price": 156, "Link": "https://example.com/hotel_39"}, {"Name": "Hotel AO", "Location": "New York", "Rating": 4.7, "Price": 290, "Link": "https://example.com/hotel_40"}, {"Name": "Hotel AP", "Location": "New York", "Rating": 3.3, "Price": 183, "Link": "https://example.com/hotel_41"}, {"Name": "Hotel AQ", "Location": "New York", "Rating": 3.8, "Price": 120, "Link": "https://example.com/hotel_42"}, {"Name": "Hotel AR", "Location": "New York", "Rating": 3.2, "Price": 179, "Link": "https://example.com/hotel_43"}, {"Name": "Hotel AS", "Location": "New York", "Rating": 3.9, "Price": 299, "Link": "https://example.com/hotel_44"}, {"Name": "Hotel AT", "Location": "New York", "Rating": 3.2, "Price": 170, "Link": "https://example.com/hotel_45"}, {"Name": "Hotel AU", "Location": "New York", "Rating": 3.7, "Price": 131, "Link": "https://example.com/hotel_46"}, {"Name": "Hotel AV", "Location": "New York", "Rating": 3.1, "Price": 437, "Link": "https://example.com/hotel_47"}, {"Name": "Hotel AW", "Location": "New York", "Rating": 4.3, "Price": 445, "Link": "https://example.com/hotel_48"}, {"Name": "Hotel AX", "Location": "New York", "Rating": 4.3, "Price": 313, "Link": "https://example.com/hotel_49"}];  // Will be replaced with actual data
+        const nodes = [];
+        const links = [];
+        const tooltip = d3.select(".tooltip");
+
+        // Find price range for scaling
+        const prices = hotels.map(h => h.Price);
+        const minPrice = Math.min(...prices);
+        const maxPrice = Math.max(...prices);
+
+        // Create color scale for price-based edges
+        const priceColorScale = d3.scaleLinear()
+            .domain([minPrice, maxPrice])
+            .range(["#e5e7eb", "#4b5563"]);  // Light grey to dark grey
+
+        // Root node
+        nodes.push({
+            id: "New York",
+            label: "NY",
+            type: "location",
+            full: "New York City",
+            radius: 45
+        });
+
+        // Create nodes and links
+        hotels.forEach((hotel, idx) => {
+            nodes.push({
+                id: hotel.Name,
+                label: `H${idx + 1}`,
+                type: "hotel",
+                full: `${hotel.Name}\nPrice: $${hotel.Price}\nRating: ${hotel.Rating}★`,
+                radius: 30,
+                price: hotel.Price
+            });
+
+            // Price-based colored edge from location to hotel
+            links.push({
+                source: "New York",
+                target: hotel.Name,
+                color: priceColorScale(hotel.Price),
+                isMainEdge: true,
+                width: 2.5
+            });
+
+            const attributes = [
+                { key: 'price', label: 'P', value: `$${hotel.Price}`, color: 'rgba(220, 38, 127, 0.95)' },
+                { key: 'rating', label: 'R', value: `${hotel.Rating}★`, color: 'rgba(34, 139, 34, 0.95)' },
+                { key: 'link', label: 'L', value: hotel.Link, color: 'rgba(106, 90, 205, 0.95)' }
+            ];
+
+            attributes.forEach(attr => {
+                const nodeId = `${hotel.Name}_${attr.key}`;
+                nodes.push({
+                    id: nodeId,
+                    label: attr.label,
+                    type: "attribute",
+                    attrType: attr.key,
+                    full: `${attr.value}`,
+                    radius: 22
+                });
+
+                links.push({
+                    source: hotel.Name,
+                    target: nodeId,
+                    color: attr.color,
+                    isChildEdge: true,
+                    width: 3.5  // Increased width for child edges
+                });
+            });
+        });
+
+        const container = document.getElementById('container');
+        const width = Math.max(container.clientWidth * 3, 3000);
+        const height = Math.max(container.clientHeight * 3, 3000);
+        
+        const svg = d3.select("#graph")
+            .append("svg")
+            .attr("width", width)
+            .attr("height", height);
+
+        const simulation = d3.forceSimulation(nodes)
+            .force("charge", d3.forceManyBody().strength(-4500))
+            .force("center", d3.forceCenter(width / 2, height / 2))
+            .force("link", d3.forceLink(links).id(d => d.id).distance(280))
+            .force("collide", d3.forceCollide().radius(d => d.radius * 6));
+
+        const link = svg.append("g")
+            .selectAll("line")
+            .data(links)
+            .join("line")
+            .attr("class", "link")
+            .style("stroke", d => d.color)
+            .style("stroke-width", d => `${d.width}px`)
+            .style("opacity", 0.8);
+
+        const node = svg.append("g")
+            .selectAll("g")
+            .data(nodes)
+            .join("g")
+            .attr("class", "node")
+            .call(d3.drag()
+                .on("start", dragstarted)
+                .on("drag", dragged)
+                .on("end", dragended));
+
+        // Enhanced node styling with bolder appearance
+        node.append("circle")
+            .attr("r", d => d.radius)
+            .style("fill", d => {
+                if (d.type === "location") return "#fbbf24";
+                if (d.type === "hotel") return "#dbeafe";
+                if (d.type === "attribute") {
+                    switch(d.attrType) {
+                        case 'price': return "#fce7f3";
+                        case 'rating': return "#dcfce7";
+                        case 'link': return "#ede9fe";
+                        default: return "#e0f2fe";
+                    }
+                }
+                return "#e0f2fe";
+            })
+            .style("stroke", d => {
+                if (d.type === "location") return "#b45309";
+                if (d.type === "hotel") return "#1d4ed8";
+                if (d.type === "attribute") {
+                    switch(d.attrType) {
+                        case 'price': return "#be185d";
+                        case 'rating': return "#15803d";
+                        case 'link': return "#5b21b6";
+                        default: return "#1e40af";
+                    }
+                }
+                return "#1e40af";
+            })
+            .style("stroke-width", d => {
+                if (d.type === "location") return "5px";
+                if (d.type === "hotel") return "4px";
+                return "4px";  // Increased border width for all nodes
+            })
+            .style("filter", "drop-shadow(0px 2px 3px rgba(0,0,0,0.2))");
+
+        node.append("text")
+            .attr("class", "node-label")
+            .text(d => d.label)
+            .attr("text-anchor", "middle")
+            .attr("dy", ".35em")
+            .style("fill", "#1e293b")
+            .style("font-size", d => d.type === "location" ? "18px" : "14px")
+            .style("font-weight", "800");
+
+        let currentZoom = 1;
+        
+        function zoomIn() {
+            currentZoom *= 1.2;
+            svg.style("transform", `scale(${currentZoom})`);
+        }
+        
+        function zoomOut() {
+            currentZoom /= 1.2;
+            svg.style("transform", `scale(${currentZoom})`);
+        }
+        
+        function resetZoom() {
+            currentZoom = 1;
+            svg.style("transform", "scale(1)");
+        }
+
+        node.on("mouseover", function(event, d) {
+            tooltip
+                .style("opacity", 1)
+                .html(d.full.replace(/\n/g, '<br/>'))
+                .style("left", (event.pageX + 15) + "px")
+                .style("top", (event.pageY - 15) + "px");
+            
+            const connectedNodes = new Set();
+            links.forEach(link => {
+                if (link.source.id === d.id) connectedNodes.add(link.target.id);
+                if (link.target.id === d.id) connectedNodes.add(link.source.id);
+            });
+            
+            node.selectAll("circle")
+                .style("opacity", n => connectedNodes.has(n.id) || n.id === d.id ? 1 : 0.2)
+                .style("transform", n => connectedNodes.has(n.id) || n.id === d.id ? "scale(1.1)" : "scale(1)")
+                .style("stroke-width", n => {
+                    if (connectedNodes.has(n.id) || n.id === d.id) {
+                        return n.type === "location" ? "6px" : "5px";
+                    }
+                    return n.type === "location" ? "5px" : "4px";
+                });
+            
+            link.style("opacity", l => 
+                l.source.id === d.id || l.target.id === d.id ? 1 : 0.1)
+                .style("stroke-width", l => {
+                    if (l.source.id === d.id || l.target.id === d.id) {
+                        return l.isChildEdge ? "4.5px" : "3.5px";
+                    }
+                    return l.isChildEdge ? "3.5px" : "2.5px";
+                });
+        })
+        .on("mouseout", function() {
+            tooltip.style("opacity", 0);
+            
+            node.selectAll("circle")
+                .style("opacity", 1)
+                .style("transform", "scale(1)")
+                .style("stroke-width", d => {
+                    if (d.type === "location") return "5px";
+                    if (d.type === "hotel") return "4px";
+                    return "4px";
+                });
+            
+            link.style("opacity", 0.8)
+                .style("stroke-width", d => d.isChildEdge ? "3.5px" : "2.5px");
+        })
+        .on("click", function(event, d) {
+            alert(`Full Information:\n${d.full}`);
+        });
+
+        simulation.on("tick", () => {
+            link
+                .attr("x1", d => d.source.x)
+                .attr("y1", d => d.source.y)
+                .attr("x2", d => d.target.x)
+                .attr("y2", d => d.target.y);
+
+            node
+                .attr("transform", d => `translate(${d.x},${d.y})`);
+        });
+
+        function dragstarted(event) {
+            if (!event.active) simulation.alphaTarget(0.3).restart();
+            event.subject.fx = event.subject.x;
+            event.subject.fy = event.subject.y;
+        }
+
+        function dragged(event) {
+            event.subject.fx = event.x;
+            event.subject.fy = event.y;
+        }
+
+        function dragended(event) {
+            if (!event.active) simulation.alphaTarget(0);
+            event.subject.fx = null;
+            event.subject.fy = null;
+        }
+    </script>
+</body>
+</html>
